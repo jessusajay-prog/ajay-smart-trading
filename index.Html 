@@ -1,0 +1,245 @@
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="theme-color" content="#101722">
+<title>AJAY SMART TRADING</title>
+<script src="https://s3.tradingview.com/tv.js"></script>
+<style>
+*{box-sizing:border-box}
+body{margin:0;background:#101722;color:#fff;font-family:Arial,sans-serif}
+header{padding:18px;background:#172231;border-bottom:1px solid #293648}
+h2{margin:0;color:#27d69b}
+small{color:#9baabd}
+nav{display:flex;gap:8px;padding:12px;overflow:auto}
+button,select{background:#233246;color:white;border:1px solid #3a4c62;border-radius:7px;padding:11px;cursor:pointer}
+button.active{background:#087e61}
+main{padding:12px}
+.panel{background:#172231;border:1px solid #293648;border-radius:10px;padding:14px;margin-bottom:12px}
+.row{display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap}
+#chart{height:390px;width:100%}
+.price{font-size:25px;font-weight:bold;margin-top:8px}
+.green{color:#27d69b}.red{color:#ff647c}
+input{background:#101722;color:white;border:1px solid #40516a;padding:10px;border-radius:7px;width:100%;margin:8px 0}
+h3{margin-top:0}
+</style>
+</head>
+<body>
+<header>
+<h2>AJAY SMART TRADING</h2>
+<small>Your Personal Trading Terminal</small>
+</header>
+
+<nav>
+<button onclick="setMarket('crypto')" id="cryptoBtn" class="active">Crypto</button>
+<button onclick="setMarket('stocks')" id="stocksBtn">Indian Stocks</button>
+</nav>
+
+<main>
+<div class="panel">
+<div class="row">
+<strong id="marketTitle">Crypto Market</strong>
+<select id="symbol" onchange="loadChart()"></select>
+</div>
+<div class="row" style="margin-top:15px">
+<span>Timeframe</span>
+<div>
+<button onclick="setIntervalValue('15')">15m</button>
+<button onclick="setIntervalValue('60')">1H</button>
+<button onclick="setIntervalValue('240')">4H</button>
+<button onclick="setIntervalValue('D')">1D</button>
+</div>
+</div>
+</div>
+
+<div class="panel">
+<div class="row">
+<strong id="chartTitle">Market Chart</strong>
+<small>TradingView Chart</small>
+</div>
+<div id="chart"></div>
+</div>
+
+<div class="panel">
+<h3>Market Analysis</h3>
+<div class="row"><span>EMA Trend</span><strong id="ema">Loading...</strong></div>
+<div class="row"><span>RSI (14)</span><strong id="rsi">Loading...</strong></div>
+<div class="row"><span>Trading Signal</span><strong id="signal">WAIT</strong></div>
+<small>Signals are rule-based, not guaranteed predictions.</small>
+</div>
+
+<div class="panel">
+<h3>Paper Trading</h3>
+<div class="price green" id="balance">₹1,00,000</div>
+<small>Virtual Balance</small>
+<p>Virtual quantity</p>
+<input id="quantity" type="number" min="0.0001" step="any" value="0.001">
+<div class="row">
+<button onclick="paperTrade('buy')" class="active">BUY</button>
+<button onclick="paperTrade('sell')">SELL</button>
+</div>
+<p id="tradeMessage">Practice with virtual money only.</p>
+</div>
+
+<div class="panel">
+<h3>My Watchlist</h3>
+<p>BTC · ETH · SOL · DOGE</p>
+<p>NIFTY · BANKNIFTY · RELIANCE · TCS</p>
+</div>
+</main>
+
+<script>
+let market='crypto', interval='15', balance=100000;
+let holdings={};
+let lastPrice=0;
+
+const cryptoSymbols={
+'BTCUSDT':'BTC / USDT',
+'ETHUSDT':'ETH / USDT',
+'SOLUSDT':'SOL / USDT',
+'DOGEUSDT':'DOGE / USDT'
+};
+const stockSymbols={
+'NSE:RELIANCE':'RELIANCE',
+'NSE:TCS':'TCS',
+'NSE:HDFCBANK':'HDFC BANK',
+'NSE:INFY':'INFOSYS',
+'NSE:NIFTY':'NIFTY 50',
+'NSE:BANKNIFTY':'BANK NIFTY'
+};
+
+function setMarket(m){
+ market=m;
+ document.getElementById('cryptoBtn').classList.toggle('active',m==='crypto');
+ document.getElementById('stocksBtn').classList.toggle('active',m==='stocks');
+ document.getElementById('marketTitle').textContent=m==='crypto'?'Crypto Market':'Indian Stock Market';
+ fillSymbols();
+ loadChart();
+}
+function fillSymbols(){
+ let s=document.getElementById('symbol');
+ s.innerHTML='';
+ let data=market==='crypto'?cryptoSymbols:stockSymbols;
+ Object.entries(data).forEach(([v,n])=>{
+  let o=document.createElement('option');
+  o.value=v;o.textContent=n;s.appendChild(o);
+ });
+}
+function setIntervalValue(v){interval=v;loadChart()}
+
+function loadChart(){
+ let symbol=document.getElementById('symbol').value;
+ document.getElementById('chartTitle').textContent=symbol;
+ document.getElementById('chart').innerHTML='';
+ document.getElementById('ema').textContent='Loading...';
+ document.getElementById('rsi').textContent='Loading...';
+ document.getElementById('signal').textContent='WAIT';
+
+ if(market==='crypto'){
+  if(window.tvWidget){window.tvWidget=null}
+  let tvInterval=interval;
+  new TradingView.widget({
+   autosize:true,
+   symbol:'BINANCE:'+symbol,
+   interval:tvInterval,
+   timezone:'Asia/Kolkata',
+   theme:'dark',
+   style:'1',
+   locale:'en',
+   enable_publishing:false,
+   hide_top_toolbar:false,
+   allow_symbol_change:true,
+   container_id:'chart'
+  });
+  analyzeCrypto(symbol);
+ }else{
+  document.getElementById('chart').innerHTML='';
+  new TradingView.widget({
+   autosize:true,
+   symbol:symbol,
+   interval:interval==='15'?'15':interval==='60'?'60':interval==='240'?'240':'D',
+   timezone:'Asia/Kolkata',
+   theme:'dark',
+   style:'1',
+   locale:'en',
+   enable_publishing:false,
+   container_id:'chart'
+  });
+  document.getElementById('ema').textContent='Stock analysis coming soon';
+  document.getElementById('rsi').textContent='Use chart indicators';
+  document.getElementById('signal').textContent='WAIT';
+ }
+}
+
+async function analyzeCrypto(symbol){
+ try{
+  let url='https://api.binance.com/api/v3/klines?symbol='+symbol+'&interval='+interval+'&limit=100';
+  let response=await fetch(url);
+  let data=await response.json();
+  if(!Array.isArray(data))throw Error('Market data unavailable');
+  let closes=data.map(x=>Number(x[4]));
+  lastPrice=closes[closes.length-1];
+  let ema9=ema(closes,9),ema21=ema(closes,21);
+  let r=calcRSI(closes,14);
+  document.getElementById('ema').textContent=ema9>ema21?'Bullish':'Bearish';
+  document.getElementById('ema').className=ema9>ema21?'green':'red';
+  document.getElementById('rsi').textContent=r.toFixed(2);
+  let sig='WAIT';
+  if(ema9>ema21&&r>50&&r<70)sig='BUY';
+  if(ema9<ema21&&r<50&&r>30)sig='SELL';
+  document.getElementById('signal').textContent=sig;
+  document.getElementById('signal').className=sig==='BUY'?'green':sig==='SELL'?'red':'';
+ }catch(e){
+  document.getElementById('ema').textContent='Unavailable';
+  document.getElementById('rsi').textContent='Unavailable';
+  document.getElementById('signal').textContent='WAIT';
+ }
+}
+function ema(a,p){
+ let k=2/(p+1),v=a.slice(0,p).reduce((x,y)=>x+y,0)/p;
+ for(let i=p;i<a.length;i++)v=a[i]*k+v*(1-k);
+ return v;
+}
+function calcRSI(a,p){
+ let gains=0,losses=0;
+ for(let i=a.length-p;i<a.length;i++){
+  let d=a[i]-a[i-1];
+  if(d>0)gains+=d;else losses-=d;
+ }
+ if(losses===0)return 100;
+ return 100-(100/(1+gains/losses));
+}
+function paperTrade(type){
+ let q=Number(document.getElementById('quantity').value);
+ let symbol=document.getElementById('symbol').value;
+ if(market!=='crypto'||!lastPrice||!q||q<=0){
+  document.getElementById('tradeMessage').textContent='Paper trading is currently enabled for Crypto only.';
+  return;
+ }
+ let cost=q*lastPrice;
+ if(type==='buy'){
+  if(cost>balance){
+   document.getElementById('tradeMessage').textContent='Not enough virtual balance.';
+   return;
+  }
+  balance-=cost;
+  holdings[symbol]=(holdings[symbol]||0)+q;
+  document.getElementById('tradeMessage').textContent='Virtual BUY completed: '+q+' '+symbol;
+ }else{
+  if((holdings[symbol]||0)<q){
+   document.getElementById('tradeMessage').textContent='Not enough virtual quantity to sell.';
+   return;
+  }
+  holdings[symbol]-=q;
+  balance+=cost;
+  document.getElementById('tradeMessage').textContent='Virtual SELL completed: '+q+' '+symbol;
+ }
+ document.getElementById('balance').textContent='₹'+balance.toFixed(2);
+}
+fillSymbols();
+loadChart();
+</script>
+</body>
+</html>
